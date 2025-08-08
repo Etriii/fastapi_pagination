@@ -28,22 +28,49 @@ app = FastAPI(
 )
 
 
-@app.get(f"/api/{version}/paginated-data", response_model=PaginationListResponse)
-def get_paginated_data(
-    page: int = Query(1, ge=1),
-    per_page: int = Query(5, ge=1, le=100),
-    session: Session = Depends(get_db),
-):
-    total_entries = session.exec(
-        select(func.count()).select_from(LotsOfDataForPagination)
-    ).one()
+# @app.get(f"/api/{version}/paginated-data", response_model=PaginationListResponse)
+# def get_paginated_data(
+#     page: int = Query(1, ge=1),
+#     per_page: int = Query(5, ge=1, le=100),
+#     session: Session = Depends(get_db),
+# ):
+#     total_entries = session.exec(
+#         select(func.count()).select_from(LotsOfDataForPagination)
+#     ).one()
+
+#     total_pages = (total_entries + per_page - 1) // per_page
+
+#     offset = (page - 1) * per_page
+#     results = session.exec(
+#         select(LotsOfDataForPagination).offset(offset).limit(per_page)
+#     ).all()
+
+#     return {
+#         "status": "success",
+#         "current_page": page,
+#         "per_page": per_page,
+#         "total_entries": total_entries,
+#         "total_pages": total_pages,
+#         "data": results,
+#     }
+
+
+from typing import Type, TypeVar
+from sqlmodel import Session, SQLModel, select
+from sqlalchemy import func
+
+T = TypeVar("T", bound=SQLModel)  # Generic type for SQLModel tables
+
+
+def paginate(session: Session, model: Type[T], page: int = 1, per_page: int = 10):
+    """Reusable pagination function for SQLModel tables."""
+
+    total_entries = session.exec(select(func.count()).select_from(model)).one()
 
     total_pages = (total_entries + per_page - 1) // per_page
-
     offset = (page - 1) * per_page
-    results = session.exec(
-        select(LotsOfDataForPagination).offset(offset).limit(per_page)
-    ).all()
+
+    results = session.exec(select(model).offset(offset).limit(per_page)).all()
 
     return {
         "status": "success",
@@ -53,3 +80,14 @@ def get_paginated_data(
         "total_pages": total_pages,
         "data": results,
     }
+    
+
+@app.get(f"/api/{version}/paginated-data", response_model=PaginationListResponse)
+def get_paginated_data(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(5, ge=1, le=100),
+    session: Session = Depends(get_db)
+):
+    return paginate(session, LotsOfDataForPagination, page, per_page)
+
+
