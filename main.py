@@ -3,7 +3,7 @@ from sqlmodel import SQLModel, Field, Session, select
 from datetime import datetime
 from fastapi import FastAPI, Depends, Query
 from sqlalchemy import Column, String, create_engine
-
+from db import get_db
 
 # === SQLModel Table ===
 class LotsOfDataForPagination(SQLModel, table=True):
@@ -33,7 +33,7 @@ app = FastAPI()
 def get_paginated_data(
     page: int = Query(1, ge=1),
     per_page: int = Query(5, ge=1, le=100),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     total_entries = session.exec(select(LotsOfDataForPagination)).count()
     total_pages = (total_entries + per_page - 1) // per_page
