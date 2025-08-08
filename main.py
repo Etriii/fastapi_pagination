@@ -1,41 +1,43 @@
-from typing import List, Literal
-from sqlmodel import SQLModel, Field, Session, select
-from datetime import datetime
+from sqlmodel import Session, select
+from sqlalchemy import func
 from fastapi import FastAPI, Depends, Query
-from sqlalchemy import Column, String, create_engine
-from db import get_db
-
-# === SQLModel Table ===
-class LotsOfDataForPagination(SQLModel, table=True):
-    __tablename__ = "lots_of_data_for_pagination"
-    id: int = Field(default=None, primary_key=True)
-    name: str = Field(sa_column=Column(String(100)))
-    created_at: datetime = Field(default_factory=datetime.now)
+from db import get_db, create_db_and_tables
+from contextlib import asynccontextmanager
+from schemas import PaginationListResponse
+from models import LotsOfDataForPagination
 
 
-# === Response Schema ===
-class PaginationResponse(SQLModel):
-    status: Literal["success"]
-    current_page: int
-    per_page: int
-    total_entries: int
-    total_pages: int
-    data: List[LotsOfDataForPagination]
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("Connecting to DB...")
+    try:
+        create_db_and_tables()
+        print("Tables created.")
+    except Exception as e:
+        print(f"Failed to create DB tables: {e}")
+
+    yield
+
+    print("Disconnecting from DB...")
 
 
-# === FastAPI App ===
-app = FastAPI()
+version = "v1"
+
+app = FastAPI(
+    lifespan=lifespan, title="API NP", description="An API for Secret", version=version
+)
 
 
-
-# === API: Paginated Data ===
-@app.get("/paginated-data", response_model=PaginationResponse)
+@app.get(f"/api/{version}/paginated-data", response_model=PaginationListResponse)
 def get_paginated_data(
     page: int = Query(1, ge=1),
     per_page: int = Query(5, ge=1, le=100),
-    session: Session = Depends(get_db)
+    session: Session = Depends(get_db),
 ):
-    total_entries = session.exec(select(LotsOfDataForPagination)).count()
+    total_entries = session.exec(
+        select(func.count()).select_from(LotsOfDataForPagination)
+    ).one()
+
     total_pages = (total_entries + per_page - 1) // per_page
 
     offset = (page - 1) * per_page
@@ -49,5 +51,5 @@ def get_paginated_data(
         "per_page": per_page,
         "total_entries": total_entries,
         "total_pages": total_pages,
-        "data": results
+        "data": results,
     }
