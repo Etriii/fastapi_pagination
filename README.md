@@ -2,8 +2,6 @@
 
 This project demonstrates how to implement **pagination** in a FastAPI application using **SQLModel** (a combination of SQLAlchemy and Pydantic).
 
-It uses a SQLite database and includes **dummy seed data** on startup.
-
 ---
 
 ## 🚀 Features
